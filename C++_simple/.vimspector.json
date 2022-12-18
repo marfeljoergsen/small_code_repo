@@ -1,0 +1,47 @@
+{
+   "configurations": {
+      "Launch": {
+         "adapter": "vscode-cpptools",
+         "configuration": {
+           "request": "launch",
+           //"program": "/home/.../code_sample/C++_simple/a.out", //cout_using_STL.cpp
+           //"args": [ ... ],
+           "cwd": "/home/.../code_sample/C++_simple",
+           //"environment": [ ... ],
+           "externalConsole": true,
+           //"MIMode": "<lldb or gdb>"
+           "MIMode": "gdb"
+         }
+      },
+      "Attach": {
+        "adapter": "vscode-cpptools",
+        "configuration": {
+          "request": "attach",
+          "program": "/home/.../bin/a.out",
+          //"MIMode": "<lldb or gdb>"
+          "MIMode": "gdb"
+        }
+//      },
+//      "Launch": {
+//         "adapter": "vscode-cpptools",
+//         "configuration": {
+//            "name": "Intel Fortran GDB (gdb-ia)",
+//            "type": "cppdbg",
+//            "request": "launch",
+//            "targetArchitecture": "x86_64",
+//            "program": "/home/.../bin/a.out",
+//            "args": ["batch.gxp"],
+//            "stopAtEntry": true,
+//            "cwd": "/home/.../code_sample/C++_simple",
+//            "environment": [{"name": "OMP_NUM_THREADS", "value": "10"}],
+//            "MIMode": "gdb",
+//            "miDebuggerPath": "/opt/intel/compilers_and_libraries_2020.0.166/linux/bin/intel64/gdb-ia",
+//            "externalConsole": false,
+//            "logging": {
+//               "engineLogging": false
+//            }
+//         }
+      }
+   }
+}
+
