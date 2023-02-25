@@ -1,0 +1,2 @@
+grep -il pattern * 2>/dev/null | while read -r fname; do echo "f=$fname"; done
+
