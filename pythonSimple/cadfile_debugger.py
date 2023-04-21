@@ -72,10 +72,14 @@ def printShapeInfo(shp):
 def printBBInfo(shp, use_mesh=False):
     # use_mesh=True returns approximate values, use_mesh=False seems more accurate!
     bb = get_boundingbox(shp, use_mesh)
+    halfdelta = tuple(l/2 for l in bb[6:9])
     print("Bounding box:")
     print("  min(x,y,z)=", bb[0:3])
     print("  max(x,y,z)=", bb[3:6])
     print("  delta(x,y,z)=", bb[6:9])
+    print("  center(x,y,z)=", tuple([sum(x) for x in zip(bb[0:3],halfdelta)]) )
+    print()
+    #import ipdb; ipdb.set_trace()
 
 def get_boundingbox(shape, tol=1e-8, use_mesh=True):
     """return the bounding box of the TopoDS_Shape `shape`
