@@ -54,6 +54,7 @@ class cadfileDebugger:
     def __init__(self, args):
         self.fname = args.filename
         self.printOnly = args.print_only
+        self.verbose = args.verbose
         self.shp = None # Init, e.g. needed for "self.recognize_face"
         if not self.printOnly:
             self.display, self.start_display, self.add_menu, self.add_function_to_menu = init_display()
@@ -64,8 +65,9 @@ class cadfileDebugger:
             # consider only this for self.verbose (not implemented yet)
             self.printShapeInfo() 
             print(' ')
-            self.recognize_batch() # might print too much?
-            print(' ')
+            if self.verbose:
+                self.recognize_batch()
+                print(' ')
 
             # This is generally useful to chceking coor-sys transforms
             self.printBBInfo()
@@ -307,6 +309,8 @@ class cadfileDebugger:
         # def read_iges_file( filename, return_as_shapes=False, verbosity=False, visible_only=False):
         # def read_stl_file(filename):
         # ---
+        # NB: See read-functions source code at: /usr/lib/python3.10/site-packages/OCC/Extend/DataExchange.py 
+        # ---
         print('Import as one shape:', self.fname)
         filename, fext = os.path.splitext(self.fname)
         if fext == '.step' or fext == '.stp':
@@ -328,7 +332,7 @@ class cadfileDebugger:
             # NB: display is an instance of Viewer3d (from init_display cf. /usr/lib/python3.10/site-packages/OCC/Display/SimpleGui.py)
             self.display.EraseAll()
             self.display.DisplayShape(shp, update=True)
-        self.shp = shp # used by "recognize_batch"
+        self.shp = shp
     
     
     def import_as_multiple_shapes(self, event=None):
@@ -434,7 +438,8 @@ class cadfileDebugger:
     
         # From: Enable click on face for details as "core_geometry_recognize_feature.py"
         self.add_menu("CAD utilities")
-        self.add_function_to_menu("CAD utilities", self.recognize_batch) # batch-mode from menu!
+        self.add_function_to_menu("CAD utilities", self.recognize_batch)
+        self.add_function_to_menu("CAD utilities", self.printBBInfo)
     
         # View-menu:
         self.add_menu("CAD views")
@@ -509,12 +514,12 @@ def parseArgs():
     required = parser.add_argument_group('required arguments')
     optional = parser._action_groups.pop()
     # Required args
-    required.add_argument('-f', '--file', dest='filename', help="CAD-file name to open", required=True)
+    required.add_argument(dest='filename', help="CAD file-name to open")
     # Optional args
     optional.add_argument('-p', '--print', dest='print_only', default=False, action='store_true',
                         help="Only print data to screen, without starting the GUI")
-    # TODO: #optional.add_argument('-v', '--verbose', dest='verbose', default=False, action='store_true',
-    #                    help="verbose output")
+    optional.add_argument('-v', '--verbose', dest='verbose', default=False, action='store_true',
+                        help="verbose output")
     parser._action_groups.append(optional)
     # If no argument besides the filename has been given; print help and exit.
     if len(sys.argv) <= 1:
