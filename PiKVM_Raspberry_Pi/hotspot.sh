@@ -255,9 +255,9 @@ systemctl restart hostapd dnsmasq
 ### Added on 03/03/22 -- just in case kvmd-otgnet-dnsmasq was already running
 # fix it by adding entry for usb0 DHCP
 if [ ! -e /usr/bin/otgnet.sh ]; then
-  #local otgsrc="https://kvmnerds.com/PiKVM/otgnet.sh"
+  #otgsrc="https://kvmnerds.com/PiKVM/otgnet.sh"
   #wget -O /usr/bin/otgnet.sh  https://kvmnerds.com/PiKVM/otgnet.sh 2> /dev/null
-  local otgsrc="https://raw.githubusercontent.com/marfeljoergsen/small_code_repo/main/PiKVM_Raspberry_Pi/otgnet.sh"
+  otgsrc="https://raw.githubusercontent.com/marfeljoergsen/small_code_repo/main/PiKVM_Raspberry_Pi/otgnet.sh"
   wget -O /usr/bin/otgnet.sh "$otgsrc" 2> /dev/null
   chmod +x /usr/bin/otgnet.sh
 fi
