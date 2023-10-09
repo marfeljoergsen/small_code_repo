@@ -3,7 +3,7 @@
 #  --> modified by Martin Felix Jorgensen ==> Remember to run with "-f" for persistency!
 #
 # Filename:  hotspot
-VER=1.9
+VER=2.0
 ## CHANGELOG:
 # 1.0   03/02/22    Created
 # 1.1   03/03/22    Added ability to always run services at boot (also otgnet network DHCP entry for dnsmasq)
@@ -14,7 +14,7 @@ VER=1.9
 # 1.6   03/22/22    Consolidated to one script for usage on both Arch and Raspbian
 # 1.7   03/30/22    nameserver = 127.0.0.1, then use ap0 IP
 # 1.8   11/05/22    use /etc/dnsmas.d/hotspot.conf instead of overwriting /etc/dnsmasq.conf
-# 1.9   11/17/22    comment out log-facility in hotspot.conf (required for raspbian)
+# 2.0   04/06/23    create systemctl_disable function as a replacement for systemctl disable (since it's broken)
 #
 # This script was written to allow PiKVM to run its wifi as hotspot AP akin to how GoPro is first configured
 #
@@ -23,11 +23,19 @@ VER=1.9
 #
 #   Hotspot network IP 10.5.4.1/24   DHCP range 10.5.4.10 - 10.5.4.250
 ###
+
+if [ $( ip -br a | grep wlan | wc -l ) -eq 0 ]; then
+  echo "Missing required wlan0 interface.  Exiting gracefully."
+  exit 1
+fi
+
+###
 # Change SSID and PASSPHRASE here
-SSID="$(hostname)-AP"
+#SSID="$(hostname)-AP"
+SSID="BliKVM"
 PASSPHRASE='pikvmisawesome'
 # Replace the first 3 octets of hotspot network here (change it to whatever you want)  Default: NETWORK="10.5.4"
-NETWORK="10.5.4"
+NETWORK="10.10.10"
 AP0IP="${NETWORK}.1"
 ###
 : '
@@ -41,22 +49,6 @@ In addition, if the pi eth0/wlan0 is connected to internet, the systems connecte
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
   echo "usage:  $0 [-f] where -f forces hotspot to run at boot; default is to run on this session only"
   exit 1
-fi
-
-if [ -e /usr/local/bin/rw ]; then rw; fi
-set -x
-
-### added 03/14/22 - create list of DNS servers from /etc/resolv.conf
-if [ ! -e /etc/kvmd/custom.dns ]; then
-  NAMESERVERS=$( for i in `grep ^nameserver /etc/resolv.conf | awk '{print $2}' | sort -r -u`; do echo -n "$i,"; done | sed 's/,$//' )
-
-  ### if current nameserver is localhost, then use ap0 IP
-  if [[ "$NAMESERVERS" == "127.0.0.1" ]]; then
-    NAMESERVERS="${AP0IP}"
-  fi
-else
-  # comma separated list of DNS servers to use
-  NAMESERVERS=$( egrep -v '^#' /etc/kvmd/custom.dns )
 fi
 
 ### Added on 03/22/22 to allow usage on both Arch and Debian (Raspbian) ###
@@ -86,6 +78,34 @@ case $ARCH in
     ;;
 esac
 
+### added on 04/06/2023 -- since systemctl disable --now doesn't work properly
+# equivalent command is systemctl stop and rm /etc/systemd/system/multi-user.target.wants/<name>.service
+# ... how arch linux broke that is beyond me
+systemctl_disable() {
+  for name in $@; do
+    systemctl stop $name.service
+    if [ -e /etc/systemd/system/multi-user.target.wants/$name.service ]; then
+      rm -f /etc/systemd/system/multi-user.target.wants/$name.service
+    fi
+  done
+}
+
+if [ -e /usr/local/bin/rw ]; then rw; fi
+set -x
+
+### added 03/14/22 - create list of DNS servers from /etc/resolv.conf
+if [ ! -e /etc/kvmd/custom.dns ]; then
+  NAMESERVERS=$( for i in `grep ^nameserver /etc/resolv.conf | awk '{print $2}' | sort -r -u`; do echo -n "$i,"; done | sed 's/,$//' )
+
+  ### if current nameserver is localhost, then use ap0 IP
+  if [[ "$NAMESERVERS" == "127.0.0.1" ]]; then
+    NAMESERVERS="${AP0IP}"
+  fi
+else
+  # comma separated list of DNS servers to use
+  NAMESERVERS=$( egrep -v '^#' /etc/kvmd/custom.dns )
+fi
+
 ### unblock wifi in the very beginning just in case
 rfkill unblock wifi
 
@@ -94,9 +114,14 @@ iw dev ap0 del 2> /dev/null
 iw dev wlan0 interface add ap0 type __ap
 
 # Stop any dnsmasq and hostapd services in case already running
-systemctl disable --now hostapd dnsmasq kvmd-otgnet-dnsmasq
+#systemctl disable --now hostapd dnsmasq kvmd-otgnet-dnsmasq
+if [ $( systemctl | grep kvmd | awk '{print $1}' | grep dnsmasq | wc -l ) -gt 0 ]; then
+  systemctl_disable hostapd dnsmasq kvmd-otgnet-dnsmasq
+else
+  systemctl_disable hostapd dnsmasq
+fi
 
-sed -i 's#^DAEMON_CONF=.*#DAEMON_CONF=/etc/hostapd/hostapd.conf#' /etc/init.d/hostapd
+if [ -e /etc/init.d/hostapd ]; then sed -i 's#^DAEMON_CONF=.*#DAEMON_CONF=/etc/hostapd/hostapd.conf#' /etc/init.d/hostapd; fi
 
 ### Add /var/lib/misc entry in /etc/fstab
 # Required for dnsmasq to keep track of leased IPs and logs
@@ -129,8 +154,9 @@ else
   DNSPORT=5553
 fi
 
-cat <<DNSMASQ > /etc/dnsmasq.conf
-#log-facility=/var/lib/misc/dnsmasq.log
+mkdir -p /etc/dnsmasq.d
+cat <<DNSMASQ > /etc/dnsmasq.d/hotspot.conf
+log-facility=/var/lib/misc/dnsmasq.log
 dhcp-range=interface:ap0,${NETWORK}.10,${NETWORK}.250,12h
 port=${DNSPORT}   # use this to listen for DNS requests
 dhcp-option=6,${NAMESERVERS}
@@ -200,7 +226,8 @@ systemctl unmask hostapd
 # If -f (force) option is passed in, then enable services to run at boot
 if [[ "$1" == "-f" || "$1" == "--firstboot" ]]; then
 
-  rm -f /usr/bin/hotspot-enable
+  rm -f /usr/bin/hotspot-enable /usr/bin/hotspot-disable
+
   cat <<SCRIPT > /usr/bin/hotspot-enable
 #!/bin/bash
 # Script to enable hotspot at anytime
@@ -220,9 +247,19 @@ iptables -A FORWARD -i ap0 -o $IFACE -j ACCEPT
 echo '1' > /proc/sys/net/ipv4/ip_forward
 
 systemctl restart hostapd dnsmasq
+sleep 5
+ip -br a | grep ap0
 SCRIPT
 
-  chmod +x /usr/bin/hotspot-enable
+  cat <<SCRIPT2 > /usr/bin/hotspot-disable
+#!/bin/bash
+# Script to disable hotspot at anytime
+set -x
+# Delete ap0 interface on top of wlan0
+iw dev ap0 del 2> /dev/null
+SCRIPT2
+
+  chmod +x /usr/bin/hotspot-enable /usr/bin/hotspot-disable
 
   # Create service file to run hotspot-enable script at boot (that runs with -f option)
   rm -f /usr/lib/systemd/system/hotspot.service
@@ -241,17 +278,15 @@ WantedBy=multi-user.target
 FWSVC
 
   # enable and start hotspot.service to start at boot
-  systemctl enable --now hotspot.service hostapd dnsmasq
+  systemctl enable --now hotspot hostapd dnsmasq
 
 else
 
   # disable hotspot.service
-  systemctl disable --now hotspot.service
+  #systemctl disable --now hotspot
+  systemctl_disable hotspot
 
 fi
-
-# Restat hostapd and dnsmasq so the config changes take effect
-systemctl restart hostapd dnsmasq
 
 ### Added on 03/03/22 -- just in case kvmd-otgnet-dnsmasq was already running
 # fix it by adding entry for usb0 DHCP
@@ -263,6 +298,9 @@ if [ ! -e /usr/bin/otgnet.sh ]; then
   chmod +x /usr/bin/otgnet.sh
 fi
 /usr/bin/otgnet.sh
+
+# Restat hostapd and dnsmasq so the config changes take effect
+systemctl restart hostapd dnsmasq
 
 sleep 3
 ip -br a | grep ap0
