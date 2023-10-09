@@ -1,5 +1,6 @@
 #!/bin/bash
 # Created by srepac@kvmnerds.com
+#  --> modified by Martin Felix Jorgensen ==> Remember to run with "-f" for persistency!
 #
 # Filename:  hotspot
 VER=1.9
